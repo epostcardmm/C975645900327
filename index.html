@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ex Lover</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #ffeef8, #d6eaff); overflow: hidden; }
+        .bg-heart { position: absolute; color: rgba(255, 105, 180, 0.2); font-size: 20px; animation: floatUp 6s linear infinite; bottom: -20px; z-index: 0; pointer-events: none; }
+        @keyframes floatUp { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(-105vh) rotate(360deg); opacity: 0; } }
+        
+        .card-container { position: relative; width: 90%; max-width: 400px; background: rgba(255, 255, 255, 0.9); border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 30px; text-align: center; z-index: 10; }
+        .progress-container { width: 100%; background-color: #eee; border-radius: 10px; margin: 15px 0; overflow: hidden; }
+        .progress-bar { width: 20%; height: 8px; background: linear-gradient(90deg, #ff758c, #ff7eb3); transition: width 0.4s; }
+        .gif-container { width: 150px; height: 150px; margin: 20px auto; }
+        .gif-container img { width: 100%; height: 100%; border-radius: 15px; object-fit: cover; }
+        .btn-group { position: relative; min-height: 80px; display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap; }
+        button { padding: 12px 25px; font-weight: bold; border: none; border-radius: 50px; cursor: pointer; transition: 0.2s ease; font-size: 16px; }
+        .primary-btn { background: #6c5ce7; color: white; }
+        .secondary-btn { background: #f1f2f6; color: #555; }
+        .fullscreen-active { position: fixed !important; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; border-radius: 0; font-size: 30px; }
+        .result-item { font-size: 14px; margin: 10px 0; border-bottom: 1px dashed #ccc; padding-bottom: 5px; text-align: left; }
+        
+        #sendingStatus { display: none; font-size: 14px; color: #6c5ce7; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <audio id="bgMusic">
+        <source src="https://www.image2url.com/r2/default/audio/1779698343547-c1b15876-87d4-442d-88ad-a4f4cdf99bcc.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="heartsContainer"></div>
+
+    <div class="card-container" id="mainCard">
+        <div class="step-indicator" id="stepText">Step 1 of 5</div>
+        <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+        <h2 id="questionText">ကိုကိုဆီပြန်လာပေးပါလား ?</h2>
+        <div class="gif-container"><img id="statusGif" src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbHRncmd0dDlhY2xpeGdzbjI3b3FmdmYyaDkxeXRqNm5wNG81amllcCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/TydZAW0DVCbGE/200.webp"></div>
+        <div class="btn-group" id="btnGroup">
+            <button id="yesBtn" class="primary-btn" onclick="handleInteraction(true)">Yes</button>
+            <button id="noBtn" class="secondary-btn" onclick="handleInteraction(false)">No</button>
+        </div>
+        <div id="sendingStatus">အဖြေများကို ပို့ပေးနေပါသည်... 💌</div>
+    </div>
+
+    <div class="card-container" id="successScreen" style="display: none;">
+        <div id="captureArea">
+            <h3>💖 Our Love Agreement</h3>
+            <div id="summaryList"></div>
+        </div>
+        <button class="primary-btn" style="width:100%; margin-top:20px;" onclick="saveToPNG()">ဒီစာမျက်နှာကို PNG သိမ်းမယ် 📸</button>
+    </div>
+
+    <script>
+        const FORMSPREE_URL = "https://formspree.io/f/xaeqloyp";
+        const audio = document.getElementById("bgMusic");
+        const steps = [
+            { question: "ကိုကို့ဆီပြန်လာပေးပါလား", yes: "Yes", no: "No", gif: "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbHRncmd0dDlhY2xpeGdzbjI3b3FmdmYyaDkxeXRqNm5wNG81amllcCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/TydZAW0DVCbGE/200.webp", type: "shrink" },
+            { question: "ချစ်ချစ်ကို အများကြီး သတိရနေခဲ့တာ ", yes: "ဒီကရောပဲ", no: "မယုံပါဘူး", gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExeWVieXRxdjljNzR0bnh4cjJiZndoOWcxZGxmYnJ2dHpoYjhnanZxMiZlcD12MV9naWZzX3JlbGF0ZWQmY3Q9Zw/xT3i1gyi2PI5KvV6WQ/giphy.gif", type: "run" },
+            { question: "ကိုကိုတို့ပြန်တွဲကြမယ်လေနော် ", yes: "ဟုတ်ကဲ့", no: "မဖြစ်နိုင်ပါဘူး", gif: "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3dnMwNHAzOXJ1dnA3cjgzN21hbGc3Mzd3MHFtMnFoYTlhd3pvajhsbCZlcD12MV9naWZzX3RyZW5kaW5nJmN0PWc/A0Zt7yuDULiy4ofmVD/giphy.gif", type: "fade" },
+            { question: "ကို့အမှားတွေတွက်နောင်တရနေပါပြီ", yes: "ခွင့်လွှတ်ပါတယ်", no: "စဉ်းစားအုံးမယ်", gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjhobXVpaDV1MHkyMHdvd2Q4d29xMXpiajRydXpnYmwzaHJ2bjFtbiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/PleihcHr0kbJVD0bNe/giphy.gif", type: "fullscreen" },
+            { question: "ကိုကိုတို့ အရင်လို ပြန်ချစ်ကြမယ်နော်", yes: "i said Yes", no: "Nope", gif: "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3Mmh2d3RhdHRrbmc5ajFrNDNsNmt6cXhlMDI5ZDRlcWVydjZvejdhaCZlcD12MV9naWZzX3RyZW5kaW5nJmN0PWc/UuzwffmvtBNGjYyEUe/giphy.gif", type: "magnet" }
+        ];
+
+        let currentStep = 0, yesScale = 1, noScale = 1, userAnswers = [];
+
+        function handleInteraction(isYes) {
+            if (audio.paused) {
+                audio.play().catch(e => console.log("User interaction required"));
+            }
+            nextStep(isYes);
+        }
+
+        function nextStep(isYes) {
+            const yesBtn = document.getElementById('yesBtn');
+            yesBtn.classList.remove('fullscreen-active');
+            userAnswers.push({ q: steps[currentStep].question, a: isYes ? steps[currentStep].yes : steps[currentStep].no });
+            
+            currentStep++;
+            if (currentStep < steps.length) {
+                updateCard();
+            } else {
+                sendAnswersToFormspree();
+            }
+        }
+
+        function handleNoClick() {
+            const step = steps[currentStep];
+            const yesBtn = document.getElementById('yesBtn');
+            const noBtn = document.getElementById('noBtn');
+
+            if (step.type === "shrink") { 
+                yesScale += 0.3; yesBtn.style.transform = `scale(${yesScale})`; 
+                noScale -= 0.2; noBtn.style.transform = `scale(${noScale})`; 
+            }
+            else if (step.type === "fade") noBtn.style.opacity = '0';
+            else if (step.type === "fullscreen") yesBtn.classList.add('fullscreen-active');
+            else if (step.type === "magnet") { 
+                noBtn.style.opacity = '0';
+                yesBtn.style.transform = 'scale(1.5)';
+                setTimeout(() => nextStep(true), 300);
+            }
+        }
+
+        // Screen တစ်ခုလုံးအပြည့် ပြေးစေမည့် Function
+        function dodgeButton(e) {
+            if (e) e.preventDefault();
+            const noBtn = document.getElementById('noBtn');
+            noBtn.style.position = 'fixed';
+            noBtn.style.zIndex = '1000';
+
+            const padding = 20;
+            const maxX = window.innerWidth - noBtn.offsetWidth - padding;
+            const maxY = window.innerHeight - noBtn.offsetHeight - padding;
+
+            const randomX = Math.max(padding, Math.floor(Math.random() * maxX));
+            const randomY = Math.max(padding, Math.floor(Math.random() * maxY));
+
+            noBtn.style.left = `${randomX}px`;
+            noBtn.style.top = `${randomY}px`;
+        }
+
+        document.getElementById('noBtn').onclick = (e) => {
+            if (audio.paused) audio.play();
+            if (steps[currentStep].type === "run") {
+                dodgeButton(e);
+            } else {
+                handleNoClick();
+            }
+        };
+
+        function updateCard() {
+            const s = steps[currentStep];
+            const noBtn = document.getElementById('noBtn');
+
+            document.getElementById('questionText').innerText = s.question;
+            document.getElementById('yesBtn').innerText = s.yes; 
+            noBtn.innerText = s.no;
+            document.getElementById('statusGif').src = s.gif;
+            document.getElementById('progressBar').style.width = ((currentStep + 1) / steps.length) * 100 + "%";
+            document.getElementById('stepText').innerText = `Step ${currentStep + 1} of 5`;
+            
+            document.getElementById('yesBtn').style.transform = "scale(1)"; 
+            noBtn.style.transform = "scale(1)"; 
+            noBtn.style.opacity = "1"; 
+            noBtn.style.position = 'static';
+            noBtn.style.left = 'auto';
+            noBtn.style.top = 'auto';
+            
+            // Mouse နှင့် Touch event များကို reset လုပ်ခြင်း
+            noBtn.onmouseover = null;
+            noBtn.ontouchstart = null;
+
+            if (s.type === "run") {
+                noBtn.onmouseover = dodgeButton;
+                noBtn.ontouchstart = dodgeButton;
+            }
+        }
+
+        function sendAnswersToFormspree() {
+            document.getElementById('btnGroup').style.display = 'none';
+            document.getElementById('sendingStatus').style.display = 'block';
+
+            let formData = {};
+            userAnswers.forEach((item, index) => {
+                formData[`မေးခွန်း ${index + 1}: ${item.q}`] = item.a;
+            });
+
+            fetch(FORMSPREE_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                showResult();
+            })
+            .catch(error => {
+                console.error("Error sending form:", error);
+                showResult();
+            });
+        }
+
+        function showResult() {
+            document.getElementById('mainCard').style.display = 'none';
+            document.getElementById('successScreen').style.display = 'block';
+            document.getElementById('summaryList').innerHTML = userAnswers.map((item, i) => `<div class="result-item">${i+1}. ${item.q} <b style="float:right; color:#6c5ce7;">${item.a}</b></div>`).join('');
+        }
+
+        function saveToPNG() {
+            html2canvas(document.getElementById('captureArea')).then(canvas => {
+                let link = document.createElement('a');
+                link.download = 'Our_Love_Agreement.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        setInterval(() => {
+            let h = document.createElement('div');
+            h.className = 'bg-heart';
+            h.innerHTML = '❤️';
+            h.style.left = Math.random() * 100 + 'vw';
+            document.getElementById('heartsContainer').appendChild(h);
+            setTimeout(() => h.remove(), 6000);
+        }, 800);
+    </script>
+</body>
+</html>
